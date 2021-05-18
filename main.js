@@ -41,6 +41,12 @@ const sendIntroFormat = () => {
   channel.send(embed);
 };
 
+const updateChnl = (guild) => {
+  guild.channels.cache
+    .get(process.env.MEMBERCOUNTCHID)
+    .setName(`member-count: ${guild.memberCount.toLocaleString()}`);
+};
+
 client.on("ready", () => {
   console.log("Logged in");
   client.user.setPresence({
@@ -64,6 +70,14 @@ client.on("message", (msg) => {
     msg.react("%F0%9F%91%8B");
     sendIntroFormat();
   }
+});
+
+client.on("guildMemberAdd", (member) => {
+  updateChnl(member.guild);
+});
+
+client.on("guildMemberRemove", (member) => {
+  updateChnl(member.guild);
 });
 
 keepAlive();
