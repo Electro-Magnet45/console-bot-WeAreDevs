@@ -1,3 +1,4 @@
+require("dotenv").config();
 const Discord = require("discord.js");
 const client = new Discord.Client();
 const keepAlive = require("./server.js");
@@ -64,7 +65,15 @@ client.on("message", (msg) => {
     client.channels.cache
       .get(process.env.REQUESTADMINCHID)
       .send(
-        `@here A new feature has been requested by ${msg.author.username}:\n${msg.content}`
+        `@here A new feature has been requested by ${msg.author.username}:`,
+        {
+          embed: {
+            description: msg.content,
+            color:
+              "#" +
+              ((Math.random() * 0xffffff) << 0).toString(16).padStart(6, "0"),
+          },
+        }
       );
   } else if (chId === process.env.INTROCHID) {
     msg.react("%F0%9F%91%8B");
