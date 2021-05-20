@@ -4,6 +4,7 @@ const client = new Discord.Client();
 const keepAlive = require("./server.js");
 const cron = require("node-cron");
 const fetch = require("node-fetch");
+const fs = require("fs");
 
 const job = cron.schedule(
   "0 0 * * *",
@@ -11,7 +12,6 @@ const job = cron.schedule(
     fetch("http://quotes.stormconsultancy.co.uk/random.json")
       .then((res) => res.json())
       .then((json) => {
-        console.log(json);
         client.channels.cache
           .get(process.env.QUOTECHID)
           .send(
@@ -26,20 +26,44 @@ const job = cron.schedule(
 
 job.start();
 
-const sendIntroFormat = () => {
-  const channel = client.channels.cache.get(process.env.INTROCHID);
+String.prototype.encodeDecode = function () {
+  var nstr = "";
+
+  for (var i = 0; i < this.length; i++) {
+    nstr += String.fromCharCode(
+      this.charCodeAt(i) ^ Number(process.env.ENCODENUM)
+    );
+  }
+
+  return nstr;
+};
+
+String.prototype.hexConv = function () {
+  var nstr = "";
+  if (this.toString() === "success") {
+    return "#1ab27c";
+  } else {
+    return "#ed4245";
+  }
+};
+
+const sendEmbed = (title, data, dest, colour, isChnl, isArray) => {
+  var content;
+  if (!isArray) {
+    content = data;
+  }
 
   const embed = new Discord.MessageEmbed()
-    .setColor(
-      "#" + ((Math.random() * 0xffffff) << 0).toString(16).padStart(6, "0")
-    )
-    .setTitle("**__Format__**")
-    .setDescription(
-      `Full Name: Console\nAge: 14\nLikes: Listening to the console\nDislikes: Alternatives to console`
-    )
+    .setColor(colour)
+    .setTitle(`**__${title}__**`)
+    .setDescription(content)
     .setTimestamp();
 
-  channel.send(embed);
+  if (isChnl) {
+    dest.send(embed);
+  } else {
+    dest.reply(embed);
+  }
 };
 
 const updateChnl = (guild) => {
@@ -54,12 +78,15 @@ client.on("ready", () => {
     activity: { name: "the console", type: "LISTENING" },
     status: "idle",
   });
+
+  "sdfsdf".hexConv();
 });
 
 client.on("message", (msg) => {
   if (msg.author.bot) return;
   if (msg.channel.type === "dm") return;
   const chId = msg.channel.id;
+  const msgContentCase = msg.content.toLocaleLowerCase();
 
   if (chId === process.env.FEATURECHID) {
     client.channels.cache
@@ -69,15 +96,117 @@ client.on("message", (msg) => {
         {
           embed: {
             description: msg.content,
-            color:
-              "#" +
-              ((Math.random() * 0xffffff) << 0).toString(16).padStart(6, "0"),
+            color: "success".hexConv(),
           },
         }
       );
   } else if (chId === process.env.INTROCHID) {
     msg.react("%F0%9F%91%8B");
-    sendIntroFormat();
+    sendEmbed(
+      "Format",
+      `Full Name: Console\nAge: 14\nLikes: Listening to the console\nDislikes: Alternatives to console`,
+      client.channels.cache.get(process.env.INTROCHID),
+      "success".hexConv(),
+      true,
+      false
+    );
+  } else if (chId === process.env.BOTCHATCHID) {
+    if (!msgContentCase.startsWith("$")) return;
+
+    if (msgContentCase.startsWith("$b-")) {
+      if (msgContentCase.substring(3, 6) === "set") {
+        const bday = msgContentCase.substring(6);
+        if (bday.includes("-") && bday.replace("-", "").length === 5) {
+          const data = fs.readFileSync("birthday.json");
+          const oldData = JSON.parse(data);
+
+          if (oldData.some((e) => e.userId === msg.author.id.encodeDecode())) {
+            sendEmbed(
+              "Birthday",
+              "You have already set your birthday!\nIf you want to delete it, use `$b-delete` command",
+              msg,
+              "error".hexConv(),
+              false,
+              false
+            );
+            return;
+          }
+          const data2 = {
+            userId: msg.author.id.encodeDecode(),
+            bDay: bday.encodeDecode(),
+          };
+          oldData.push(data2);
+          const newData = JSON.stringify(oldData, null, 2);
+
+          fs.writeFileSync("birthday.json", newData);
+          sendEmbed(
+            "Birthday",
+            `Set your birthday!\nYour next birthday is on ${bday}\n\nIf this is wrong delete your birthday by ${"`$b-delete`"} command`,
+            msg,
+            "success".hexConv(),
+            false,
+            false
+          );
+        } else {
+          sendEmbed(
+            "Birthday",
+            "Send a valid date format\n`MM-DD`",
+            msg,
+            "success".hexConv(),
+            false,
+            false
+          );
+        }
+      } else if (msgContentCase.substring(3) === "delete") {
+        const data = fs.readFileSync("birthday.json");
+        const oldData = JSON.parse(data);
+        const data2 = oldData.filter((e) => {
+          return e.userId !== msg.author.id.encodeDecode();
+        });
+        const newData = JSON.stringify(data2, null, 2);
+
+        fs.writeFileSync("birthday.json", newData);
+        sendEmbed(
+          "Birthday",
+          "You have deleted your birthday!",
+          msg,
+          "success".hexConv(),
+          false,
+          false
+        );
+      } else if (msgContentCase.substring(3) === "info") {
+        const data1 = fs.readFileSync("birthday.json");
+        const data = JSON.parse(data1);
+        if (!data.some((e) => e.userId === msg.author.id.encodeDecode())) {
+          sendEmbed(
+            "Birthday",
+            "You haven't set your birthday yet!\nSet it by `$b-set MM-DD` command",
+            msg,
+            "error".hexConv(),
+            false,
+            false
+          );
+          return;
+        }
+
+        sendEmbed(
+          "Birthday",
+          `Your Birthday is on ${data.bDay}`,
+          msg,
+          "success".hexConv(),
+          false,
+          false
+        );
+      } else
+        sendEmbed(
+          "Console Bot",
+          "Send a valid command",
+          msg,
+          "error".hexConv(),
+          false,
+          false
+        );
+    }
   }
 });
 
