@@ -2,29 +2,7 @@ require("dotenv").config();
 const Discord = require("discord.js");
 const client = new Discord.Client();
 const keepAlive = require("./server.js");
-const cron = require("node-cron");
-const fetch = require("node-fetch");
 const fs = require("fs");
-
-const job = cron.schedule(
-  "0 0 * * *",
-  () => {
-    fetch("http://quotes.stormconsultancy.co.uk/random.json")
-      .then((res) => res.json())
-      .then((json) => {
-        client.channels.cache
-          .get(process.env.QUOTECHID)
-          .send(
-            `@everyone\n_"${json.quote}"_ -${json.author}\nGood Morning ! :sun_with_face: :sun_with_face: `
-          );
-      });
-  },
-  {
-    timezone: "Asia/Kolkata",
-  }
-);
-
-job.start();
 
 String.prototype.encodeDecode = function () {
   var nstr = "";
@@ -39,7 +17,6 @@ String.prototype.encodeDecode = function () {
 };
 
 String.prototype.hexConv = function () {
-  var nstr = "";
   if (this.toString() === "success") {
     return "#1ab27c";
   } else {
