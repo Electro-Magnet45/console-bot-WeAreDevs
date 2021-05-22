@@ -55,8 +55,6 @@ client.on("ready", () => {
     activity: { name: "the console", type: "LISTENING" },
     status: "idle",
   });
-
-  "sdfsdf".hexConv();
 });
 
 client.on("message", (msg) => {
@@ -65,18 +63,22 @@ client.on("message", (msg) => {
   const chId = msg.channel.id;
   const msgContentCase = msg.content.toLocaleLowerCase();
 
-  if (chId === process.env.FEATURECHID) {
+  if (chId === process.env.SUGGESTIONCHATCHID) {
+    const embed = new Discord.MessageEmbed()
+      .setAuthor(msg.author.username, msg.author.displayAvatarURL())
+      .setColor("#ffea00")
+      .setDescription(`${msg.content}\n`)
+      .addFields({
+        name: "**Status:**",
+        value: "⏳Waiting for Feedbacks from users.",
+      });
     client.channels.cache
-      .get(process.env.REQUESTADMINCHID)
-      .send(
-        `@here A new feature has been requested by ${msg.author.username}:`,
-        {
-          embed: {
-            description: msg.content,
-            color: "success".hexConv(),
-          },
-        }
-      );
+      .get(process.env.SUGGESTIONCHID)
+      .send(embed)
+      .then((msg) => {
+        msg.react("👍");
+        msg.react("👎");
+      });
   } else if (chId === process.env.INTROCHID) {
     msg.react("%F0%9F%91%8B");
     sendEmbed(
@@ -87,6 +89,46 @@ client.on("message", (msg) => {
       true,
       false
     );
+  } else if (chId === process.env.DISCUSSADMINCHID) {
+    if (!msg.content.startsWith("f!")) return;
+    const msgContentCase = msg.content.substring(2).toLocaleLowerCase();
+
+    if (msgContentCase.substring(0, 3) === "set") {
+      const msgId = msgContentCase.substring(3).split(" ")[1];
+      const status = msgContentCase
+        .substring(3)
+        .toLocaleLowerCase()
+        .split(" ")[2];
+      const chnl = client.channels.cache.get(process.env.SUGGESTIONCHID);
+
+      if (msgId && status) {
+        chnl.messages.fetch(msgId).then((message) => {
+          const messageEmb = message.embeds[0];
+          const embed = new Discord.MessageEmbed()
+            .setAuthor(messageEmb.author.name, messageEmb.author.iconURL)
+            .setColor(
+              status === "accept" ? "success".hexConv() : "error".hexConv()
+            )
+            .setDescription(messageEmb.description)
+            .addFields({
+              name: "**Status:**",
+              value:
+                status === "accept"
+                  ? "✅ Accepted! This feature will be released soon!"
+                  : "❌ Rejected! Thanks for the suggestion, but we are not inerested in this feature..",
+            });
+          message.edit(embed);
+
+          msg.channel.send(
+            `The ${msgId} request has been ${
+              status === "accept" ? status + "ed" : status + "d"
+            } by \<@${msg.author.id}>`
+          );
+        });
+      } else {
+        msg.reply("This message or your commands does not exist!");
+      }
+    }
   } else if (chId === process.env.BOTCHATCHID) {
     if (!msgContentCase.startsWith("$")) return;
 
