@@ -3,6 +3,7 @@ const Discord = require("discord.js");
 const client = new Discord.Client();
 const keepAlive = require("./server.js");
 const fs = require("fs");
+const cron = require("node-cron");
 
 String.prototype.encodeDecode = function () {
   var nstr = "";
@@ -55,6 +56,34 @@ client.on("ready", () => {
     activity: { name: "the console", type: "LISTENING" },
     status: "idle",
   });
+
+  const job0 = cron.schedule(
+    "0 0 * * *",
+    () => {
+      const data = fs.readFileSync("birthday.json");
+      const birthdays = JSON.parse(data);
+      const bthChnl = client.channels.cache.get(process.env.BIRTHDAYSCHID);
+      const d = new Date();
+      const mNow = d.getMonth();
+      const dNow = d.getDate();
+
+      birthdays.map((birthday) => {
+        const bDay = birthday.bDay.encodeDecode().split("-");
+        if (Number(bDay[0]) === mNow) {
+          if (Number(bDay[1]) == dNow) {
+            bthChnl.send(
+              `<@${birthday.userId.encodeDecode()}> Happy Birthday 🎂🎂🎂!!`
+            );
+          }
+        }
+      });
+    },
+    {
+      timezone: "Asia/Kolkata",
+    }
+  );
+
+  job0.start();
 });
 
 client.on("message", (msg) => {
@@ -134,8 +163,17 @@ client.on("message", (msg) => {
 
     if (msgContentCase.startsWith("$b-")) {
       if (msgContentCase.substring(3, 6) === "set") {
-        const bday = msgContentCase.substring(6);
-        if (bday.includes("-") && bday.replace("-", "").length === 5) {
+        const bday = msgContentCase.substring(7);
+        if (
+          bday.includes("-") &&
+          bday.split("-")[0].length > 0 &&
+          bday.split("-")[1].length > 0
+        ) {
+          const day = bday.split("-")[1].replace(/^0+/, "");
+          const mnth = bday.split("-")[0].replace(/^0+/, "");
+          const month = mnth - 1;
+          const birthDay = `${month}-${day}`;
+
           const data = fs.readFileSync("birthday.json");
           const oldData = JSON.parse(data);
 
@@ -152,7 +190,7 @@ client.on("message", (msg) => {
           }
           const data2 = {
             userId: msg.author.id.encodeDecode(),
-            bDay: bday.encodeDecode(),
+            bDay: birthDay.encodeDecode(),
           };
           oldData.push(data2);
           const newData = JSON.stringify(oldData, null, 2);
@@ -160,7 +198,13 @@ client.on("message", (msg) => {
           fs.writeFileSync("birthday.json", newData);
           sendEmbed(
             "Birthday",
-            `Set your birthday!\nYour next birthday is on ${bday}\n\nIf this is wrong delete your birthday by ${"`$b-delete`"} command`,
+            `Set your birthday!\nYour next birthday is on ${mnth.padStart(
+              2,
+              "0"
+            )}-${day.padStart(
+              2,
+              "0"
+            )}\n\nIf this is wrong delete your birthday by ${"`$b-delete`"} command`,
             msg,
             "success".hexConv(),
             false,
@@ -208,14 +252,26 @@ client.on("message", (msg) => {
           return;
         }
 
-        sendEmbed(
-          "Birthday",
-          `Your Birthday is on ${data.bDay}`,
-          msg,
-          "success".hexConv(),
-          false,
-          false
-        );
+        data.map((e) => {
+          if (e.userId === msg.author.id.encodeDecode()) {
+            const data = e.bDay.encodeDecode();
+            const day = data.split("-")[1];
+            const mnth = data.split("-")[0];
+            const month = Number(mnth) + 1;
+            const birthDay = `${String(month).padStart(2, "0")}-${day.padStart(
+              2,
+              "0"
+            )}`;
+            sendEmbed(
+              "Birthday",
+              `Your Birthday is on ${birthDay}`,
+              msg,
+              "success".hexConv(),
+              false,
+              false
+            );
+          }
+        });
       } else
         sendEmbed(
           "Console Bot",
