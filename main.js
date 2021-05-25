@@ -44,6 +44,18 @@ const sendEmbed = (title, data, dest, colour, isChnl, isArray) => {
   }
 };
 
+const sendUserEmbed = (author, author2, thumbnail, colour, description) => {
+  const chnl = client.channels.cache.get(process.env.HUBADMINCHID);
+  const embed = new Discord.MessageEmbed()
+    .setAuthor(author, author2)
+    .setThumbnail(thumbnail)
+    .setColor(colour)
+    .setDescription(description)
+    .setTimestamp();
+
+  chnl.send(embed);
+};
+
 const updateChnl = (guild) => {
   guild.channels.cache
     .get(process.env.MEMBERCOUNTCHID)
@@ -119,43 +131,98 @@ client.on("message", (msg) => {
       false
     );
   } else if (chId === process.env.DISCUSSADMINCHID) {
-    if (!msg.content.startsWith("f!")) return;
-    const msgContentCase = msg.content.substring(2).toLocaleLowerCase();
+    if (msg.content.startsWith("f!")) {
+      const msgContentCase = msg.content.substring(2).toLocaleLowerCase();
 
-    if (msgContentCase.substring(0, 3) === "set") {
-      const msgId = msgContentCase.substring(3).split(" ")[1];
-      const status = msgContentCase
-        .substring(3)
-        .toLocaleLowerCase()
-        .split(" ")[2];
-      const chnl = client.channels.cache.get(process.env.SUGGESTIONCHID);
+      if (msgContentCase.substring(0, 3) === "set") {
+        const msgId = msgContentCase.substring(3).split(" ")[1];
+        const status = msgContentCase
+          .substring(3)
+          .toLocaleLowerCase()
+          .split(" ")[2];
+        const chnl = client.channels.cache.get(process.env.SUGGESTIONCHID);
 
-      if (msgId && status) {
-        chnl.messages.fetch(msgId).then((message) => {
-          const messageEmb = message.embeds[0];
-          const embed = new Discord.MessageEmbed()
-            .setAuthor(messageEmb.author.name, messageEmb.author.iconURL)
-            .setColor(
-              status === "accept" ? "success".hexConv() : "error".hexConv()
-            )
-            .setDescription(messageEmb.description)
-            .addFields({
-              name: "**Status:**",
-              value:
-                status === "accept"
-                  ? "✅ Accepted! This feature will be released soon!"
-                  : "❌ Rejected! Thanks for the suggestion, but we are not inerested in this feature..",
-            });
-          message.edit(embed);
+        if (msgId && status) {
+          chnl.messages.fetch(msgId).then((message) => {
+            const messageEmb = message.embeds[0];
+            const embed = new Discord.MessageEmbed()
+              .setAuthor(messageEmb.author.name, messageEmb.author.iconURL)
+              .setColor(
+                status === "accept" ? "success".hexConv() : "error".hexConv()
+              )
+              .setDescription(messageEmb.description)
+              .addFields({
+                name: "**Status:**",
+                value:
+                  status === "accept"
+                    ? "✅ Accepted! This feature will be released soon!"
+                    : "❌ Rejected! Thanks for the suggestion, but we are not inerested in this feature..",
+              });
+            message.edit(embed);
 
-          msg.channel.send(
-            `The ${msgId} request has been ${
-              status === "accept" ? status + "ed" : status + "d"
-            } by \<@${msg.author.id}>`
+            msg.channel.send(
+              `The ${msgId} request has been ${
+                status === "accept" ? status + "ed" : status + "d"
+              } by \<@${msg.author.id}>`
+            );
+          });
+        } else {
+          msg.reply("This message or your commands does not exist!");
+        }
+      }
+    } else if (msg.content.startsWith("$m-")) {
+      if (msgContentCase.substring(3, 6) === "ban") {
+        if (!msg.member.hasPermission("BAN_MEMBERS")) return;
+        const userId = msgContentCase.split(" ")[1];
+        const user = msg.guild.members.cache.get(userId);
+        const days = Number(msgContentCase.split(" ")[2]);
+        const reason = msg.content.split(" ").slice(3).join(" ");
+        if (!user || !days || !reason) return;
+
+        user.ban({ days: days, reason: reason }).then(() => {
+          const author = `Banned by ${msg.author.username}#${msg.author.discriminator}`;
+          sendUserEmbed(
+            author,
+            msg.author.displayAvatarURL(),
+            user.user.avatarURL(),
+            "error".hexConv(),
+            `**Action**: Ban\n**User**: ${user.user.username}#${user.user.discriminator}\n**Days**: ${days}\n**Reason**: ${reason}`
           );
         });
-      } else {
-        msg.reply("This message or your commands does not exist!");
+      } else if (msgContentCase.substring(3, 8) === "unban") {
+        if (!msg.member.hasPermission("BAN_MEMBERS")) return;
+        const userId = msgContentCase.split(" ")[1];
+        const reason = msg.content.split(" ").slice(2).join(" ");
+        if (!userId || !reason) return;
+
+        msg.guild.members.unban(userId).then(() => {
+          const user = msg.guild.members.cache.get(userId);
+          const author = `UnBanned by ${msg.author.username}#${msg.author.discriminator}`;
+          sendUserEmbed(
+            author,
+            msg.author.displayAvatarURL(),
+            user.user.displayAvatarURL(),
+            "success".hexConv(),
+            `**Action**: UnBan\n**User**: ${user.user.username}#${user.user.discriminator}\n**Reason**: ${reason}`
+          );
+        });
+      } else if (msgContentCase.substring(3, 7) === "kick") {
+        if (!msg.member.hasPermission("KICK_MEMBERS")) return;
+        const userId = msgContentCase.split(" ")[1];
+        const user = msg.guild.members.cache.get(userId);
+        const reason = msg.content.split(" ").slice(2).join(" ");
+        if (!user || !reason) return;
+
+        user.kick({ reason: reason }).then(() => {
+          const author = `Kicked by ${msg.author.username}#${msg.author.discriminator}`;
+          sendUserEmbed(
+            author,
+            msg.author.displayAvatarURL(),
+            user.user.avatarURL(),
+            "error".hexConv(),
+            `**Action**: Kick\n**User**: ${user.user.username}#${user.user.discriminator}\n**Reason**: ${reason}`
+          );
+        });
       }
     }
   } else if (chId === process.env.BOTCHATCHID) {
