@@ -1,9 +1,14 @@
 require("dotenv").config();
 const Discord = require("discord.js");
-const client = new Discord.Client();
+const client = new Discord.Client({
+  partials: ["MESSAGE", "CHANNEL", "REACTION"],
+});
 const keepAlive = require("./server.js");
 const fs = require("fs");
 const cron = require("node-cron");
+const mongoose = require("mongoose");
+const Questiondata = require("./QuestionData.js");
+const Canvas = require("canvas");
 
 String.prototype.encodeDecode = function () {
   var nstr = "";
@@ -23,6 +28,17 @@ String.prototype.hexConv = function () {
   } else {
     return "#ed4245";
   }
+};
+
+const applyText = (canvas, text) => {
+  const context = canvas.getContext("2d");
+  let fontSize = 70;
+
+  do {
+    context.font = `${(fontSize -= 10)}px sans-serif`;
+  } while (context.measureText(text).width > canvas.width - 300);
+
+  return context.font;
 };
 
 const sendEmbed = (title, data, dest, colour, isChnl, isArray) => {
@@ -69,6 +85,17 @@ client.on("ready", () => {
     status: "idle",
   });
 
+  const connection_url = process.env.DB_URL;
+  mongoose
+    .connect(connection_url, {
+      useCreateIndex: true,
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+
   const job0 = cron.schedule(
     "0 0 * * *",
     () => {
@@ -100,7 +127,46 @@ client.on("ready", () => {
 
 client.on("message", (msg) => {
   if (msg.author.bot) return;
-  if (msg.channel.type === "dm") return;
+  if (msg.channel.type === "dm") {
+    Questiondata.findOne({
+      userId: msg.author.id,
+    })
+      .sort({ date: "descending" })
+      .exec((err, data) => {
+        if (!err && data) {
+          const chnl = client.channels.cache.get(process.env.HELPCHID);
+          chnl.messages.fetch(data.questionId).then((message) => {
+            const messageEmb = message.embeds[0];
+            const embed = new Discord.MessageEmbed()
+              .setAuthor(messageEmb.author.name, messageEmb.author.iconURL)
+              .setColor("#ffea00")
+              .setDescription(messageEmb.description)
+              .addFields(
+                {
+                  name: "**Tags:**",
+                  value: `${msg.content}\n`,
+                  inline: true,
+                },
+                {
+                  name: "**Status:**",
+                  value: "⏳Waiting for Answers",
+                }
+              );
+            message.edit(embed);
+            Questiondata.deleteOne(
+              {
+                userId: msg.author.id,
+              },
+              (err, data) => {
+                msg.reply(
+                  "Make sure you react with ✅ if your answer is solved in the #help channnel!"
+                );
+              }
+            );
+          });
+        }
+      });
+  }
   const chId = msg.channel.id;
   const msgContentCase = msg.content.toLocaleLowerCase();
 
@@ -349,11 +415,113 @@ client.on("message", (msg) => {
           false
         );
     }
+  } else if (chId === process.env.HELPCHATCHID) {
+    if (!msg.mentions.roles.first()) return;
+    if (msg.mentions.roles.first().id !== process.env.QUESTIONROLEID) return;
+    const chnl = client.channels.cache.get(process.env.HELPCHID);
+    const embed = new Discord.MessageEmbed()
+      .setAuthor(msg.author.username, msg.author.displayAvatarURL())
+      .setColor("#ffea00")
+      .setDescription(`${msg.content}\n`)
+      .addFields({
+        name: "**Status:**",
+        value: "⏳Waiting for Answers",
+      });
+    chnl.send(embed).then((sendMsg) => {
+      sendMsg.react("✅");
+      Questiondata.create(
+        {
+          userId: msg.author.id,
+          questionId: sendMsg.id,
+        },
+        (err, data) => {
+          msg.member.send(
+            `Heyyy! Please provide the suitable tags for this question\n${sendMsg.url}\nSeperate the tags with a comma(,). Eg: nodejs, python, java`
+          );
+        }
+      );
+    });
   }
 });
 
-client.on("guildMemberAdd", (member) => {
+client.on("messageReactionAdd", async (reaction, user) => {
+  if (user.bot) return;
+
+  if (reaction.message.channel.id === process.env.HELPCHID) {
+    if (reaction.partial) {
+      try {
+        await reaction.fetch();
+      } catch (error) {
+        return;
+      }
+    }
+
+    const authorId = reaction.message.embeds[0].author.iconURL.split("/")[4];
+    if (user.id !== authorId) {
+      reaction.remove();
+    } else {
+      const field1 = reaction.message.embeds[0].fields[0];
+      const messageEmb = reaction.message.embeds[0];
+      const embed = new Discord.MessageEmbed()
+        .setAuthor(messageEmb.author.name, messageEmb.author.iconURL)
+        .setColor("success".hexConv())
+        .setDescription(messageEmb.description)
+        .addFields(field1, {
+          name: "**Status:**",
+          value: "✅This question is answered",
+        });
+      reaction.message.edit(embed);
+    }
+  }
+});
+
+client.on("guildMemberAdd", async (member) => {
   updateChnl(member.guild);
+  const channel = member.guild.channels.cache.find(
+    (ch) => ch.id === process.env.WELCOMECHID
+  );
+
+  const canvas = Canvas.createCanvas(700, 250);
+  const context = canvas.getContext("2d");
+
+  const background = await Canvas.loadImage("./background.png");
+  context.drawImage(background, 0, 0, canvas.width, canvas.height);
+
+  context.strokeStyle = "#74037b";
+  context.strokeRect(0, 0, canvas.width, canvas.height);
+
+  context.font = "28px sans-serif";
+  context.fillStyle = "#ffffff";
+  context.fillText(
+    "Welcoming To The Server,",
+    canvas.width / 2.5,
+    canvas.height / 3.5
+  );
+
+  context.font = applyText(canvas, `${member.displayName}!`);
+  context.fillStyle = "#ffffff";
+  context.fillText(
+    `${member.displayName}!`,
+    canvas.width / 2.5,
+    canvas.height / 1.8
+  );
+
+  context.beginPath();
+  context.arc(125, 125, 100, 0, Math.PI * 2, true);
+  context.closePath();
+  context.clip();
+
+  const avatar = await Canvas.loadImage(
+    member.user.displayAvatarURL({ format: "jpg" })
+  );
+  context.drawImage(avatar, 25, 25, 200, 200);
+
+  const attachment = new Discord.MessageAttachment(
+    canvas.toBuffer(),
+    "welcome-image.png"
+  );
+
+  channel.send("", attachment);
 });
 
 client.on("guildMemberRemove", (member) => {
