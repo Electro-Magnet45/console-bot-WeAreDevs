@@ -153,7 +153,7 @@ client.on("message", (msg) => {
                 }
               );
             message.edit(embed);
-            Questiondata.deleteOne(
+            Questiondata.deleteMany(
               {
                 userId: msg.author.id,
               },
@@ -458,7 +458,10 @@ client.on("messageReactionAdd", async (reaction, user) => {
 
     const authorId = reaction.message.embeds[0].author.iconURL.split("/")[4];
     if (user.id !== authorId) {
-      reaction.remove();
+      const message = await reaction.message.channel.messages.fetch(
+        reaction.message.id
+      );
+      message.reactions.resolve("✅").users.remove(user.id);
     } else {
       const field1 = reaction.message.embeds[0].fields[0];
       const messageEmb = reaction.message.embeds[0];
@@ -466,10 +469,15 @@ client.on("messageReactionAdd", async (reaction, user) => {
         .setAuthor(messageEmb.author.name, messageEmb.author.iconURL)
         .setColor("success".hexConv())
         .setDescription(messageEmb.description)
-        .addFields(field1, {
-          name: "**Status:**",
-          value: "✅This question is answered",
-        });
+        .addFields(
+          field1.value == "⏳Waiting for Answers"
+            ? { name: "Tags", value: "No Tag" }
+            : field1,
+          {
+            name: "**Status:**",
+            value: "✅This question is answered",
+          }
+        );
       reaction.message.edit(embed);
     }
   }
