@@ -30,6 +30,48 @@ String.prototype.hexConv = function () {
   }
 };
 
+const bDayCommands = [
+  {
+    code: "`$b-set MM-DD`",
+    desc: "Set your birthday",
+  },
+  {
+    code: "`$b-delete`",
+    desc: "Delete your birthday",
+  },
+  {
+    code: "`$b-info`",
+    desc: "Info about your birthday",
+  },
+  {
+    code: "`$c-help`",
+    desc: "Get help",
+  },
+];
+
+const adminCommands = [
+  {
+    code: "`$m-kick userId reason`",
+    desc: "Kick the user",
+  },
+  {
+    code: "`$m-ban userId reason`",
+    desc: "Ban the user",
+  },
+  {
+    code: "`$m-unban userId reason`",
+    desc: "UnBan the user",
+  },
+  {
+    code: "`f!set suggestionId status`",
+    desc: "`accept` or `decline` suggestions",
+  },
+  {
+    code: "`$c-help`",
+    desc: "Get help",
+  },
+];
+
 const applyText = (canvas, text) => {
   const context = canvas.getContext("2d");
   let fontSize = 70;
@@ -72,10 +114,28 @@ const sendUserEmbed = (author, author2, thumbnail, colour, description) => {
   chnl.send(embed);
 };
 
-const updateChnl = (guild) => {
-  guild.channels.cache
-    .get(process.env.MEMBERCOUNTCHID)
-    .setName(`member-count: ${guild.memberCount.toLocaleString()}`);
+const sendHelp = (msg, chId) => {
+  var title;
+  var res;
+  if (chId === process.env.DISCUSSADMINCHID) {
+    title = "Moderation Commands";
+    res = adminCommands
+      .map(({ code, desc }) => `${code}\n ${desc}   `)
+      .join("\n\n");
+  } else if (chId === process.env.BOTCHATCHID) {
+    title = "Birthday Commands";
+    res = bDayCommands
+      .map(({ code, desc }) => `${code}\n ${desc}   `)
+      .join("\n\n");
+  }
+
+  const embed = new Discord.MessageEmbed()
+    .setColor("success".hexConv())
+    .setTitle(`__${title}__`)
+    .setDescription(res)
+    .setTimestamp();
+
+  msg.reply(embed);
 };
 
 client.on("ready", () => {
@@ -116,6 +176,16 @@ client.on("ready", () => {
           }
         }
       });
+
+      const introChnl = client.channel.cache.get(processe.env.INTROCHID);
+      sendEmbed(
+        "Format",
+        `Full Name: Console\nAge: 14\nLikes: Listening to the console\nDislikes: Alternatives to console`,
+        introChnl,
+        "success".hexConv(),
+        true,
+        false
+      );
     },
     {
       timezone: "Asia/Kolkata",
@@ -170,6 +240,10 @@ client.on("message", (msg) => {
   const chId = msg.channel.id;
   const msgContentCase = msg.content.toLocaleLowerCase();
 
+  if (msg.content === "$c-help") {
+    sendHelp(msg, chId);
+  }
+
   if (chId === process.env.SUGGESTIONCHATCHID) {
     const embed = new Discord.MessageEmbed()
       .setAuthor(msg.author.username, msg.author.displayAvatarURL())
@@ -188,14 +262,6 @@ client.on("message", (msg) => {
       });
   } else if (chId === process.env.INTROCHID) {
     msg.react("%F0%9F%91%8B");
-    sendEmbed(
-      "Format",
-      `Full Name: Console\nAge: 14\nLikes: Listening to the console\nDislikes: Alternatives to console`,
-      client.channels.cache.get(process.env.INTROCHID),
-      "success".hexConv(),
-      true,
-      false
-    );
   } else if (chId === process.env.DISCUSSADMINCHID) {
     if (msg.content.startsWith("f!")) {
       const msgContentCase = msg.content.substring(2).toLocaleLowerCase();
@@ -484,7 +550,6 @@ client.on("messageReactionAdd", async (reaction, user) => {
 });
 
 client.on("guildMemberAdd", async (member) => {
-  updateChnl(member.guild);
   const channel = member.guild.channels.cache.find(
     (ch) => ch.id === process.env.WELCOMECHID
   );
@@ -529,11 +594,10 @@ client.on("guildMemberAdd", async (member) => {
     "welcome-image.png"
   );
 
-  channel.send("", attachment);
-});
-
-client.on("guildMemberRemove", (member) => {
-  updateChnl(member.guild);
+  channel.send(
+    `Welcome ${member}, head to the <#${process.env.SERVERINFOCHID}>`,
+    attachment
+  );
 });
 
 keepAlive();
